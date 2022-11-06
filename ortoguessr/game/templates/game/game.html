@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% load static %}
+{% block head %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.1.0/ol.css">
+<style>
+    .question {
+        height: 400px;
+    }
+
+    .answer {
+        height: 400px;
+    }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/ol@v7.1.0/dist/ol.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.min.js"
+    integrity="sha512-pLnzlcFjcj9A9ggTfXZyscd+BWAV9pHdDrLekEoTimItxZI3uOAi7CSLXAHGZu7zRgG9Xyhl9bG3A1uRSJJOJg=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+{% endblock %}
+{% block body %}
+<div class="container">
+    <div class="row pt-2">
+        <div class="col mr-4">
+            <table class="table table-condensed">
+                <thead id="header">
+                    <tr>
+                        <th scope="col"> <button type="button" class="btn btn-danger btn-sm"
+                                onclick="toFront()">&larr;</button></th>
+                        <th scope="col">Timer</th>
+                        <th scope="col">Distance</th>
+                        <th scope="col">Score</th>
+                        <th scope="col">Total</th>
+                        <th scope="col">Todo </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td></td>
+                        <td id="timer">0</th>
+                        <td id="distance">0 m</td>
+                        <td id="score">0</td>
+                        <td id="total">0</td>
+                        <td id="qLeft">0</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="row mb-3">
+        <div class="col">
+            <div id="answer" class="answer"></div>
+        </div>
+        <div class="col">
+            <div id="question" class="question"></div>
+        </div>
+    </div>
+    <div class="row mb-2">
+        <div class="col">
+            <button type="button" id="btnGuess" class="btn btn-warning" onclick="finish()">Guess!</button>
+        </div>
+        <div class="col">
+            <button type="button" id="btnNext" class="btn btn-primary" onclick="nextQuestion()">Start game</button>
+        </div>
+    </div>
+</div>
+<script type="text/javascript">
+    function toFront() {
+        location.href = "/";
+    }
+    const Extent = [120000, 5900000, 1000000, 6500000]
+    const Resolutions = [1638.4, 819.2, 409.6, 204.8, 102.4, 51.2, 25.6, 12.8, 6.4, 3.2, 1.6, 0.8, 0.4, 0.2]
+    const MatrixIds =
+        ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13']
+    const Size = [256, 256]
+    const dfTileGrid = new ol.tilegrid.WMTS({
+        extent: Extent,
+        resolutions: Resolutions,
+        matrixIds: MatrixIds
+    })
+    const totalQuestions = 5;
+    proj4.defs('EPSG:25832', "+proj=utm +zone=32 +ellps=GRS80 +units=m +no_defs");
+    ol.proj.proj4.register(proj4);
+    const projection = ol.proj.get('EPSG:25832');
+    projection.setExtent(Extent);
+    let initialCenter = [654500, 6176450];
+    let initialZoom = 3;
+    const level = {{ level }};
+    var qStyle = new ol.style.Style({
+        image: new ol.style.Circle({
+            radius: 7,
+            //fill: new ol.style.Fill({color: 'black'}),
+            stroke: new ol.style.Stroke({
+                color: [255, 0, 0], width: 2
+            })
+        })
+    });
+    var aStyle = new ol.style.Style({
+        image: new ol.style.Circle({
+            radius: 5,
+            //fill: new ol.style.Fill({color: 'black'}),
+            stroke: new ol.style.Stroke({
+                color: [0, 200, 200], width: 2
+            })
+        })
+    });
+    markerLyrQ = new ol.layer.Vector({
+        source: new ol.source.Vector({
+            features: [
+                new ol.Feature({
+                    geometry: new ol.geom.Point(initialCenter)
+                })
+            ]
+        }),
+        style: qStyle
+    });
+
+    var question = new ol.Map({
+        target: 'question',
+        controls: [],
+        interactions: [],
+        layers: [
+            new ol.layer.Image({
+                // opacity: 0.7,
+                source: new ol.source.ImageWMS({
+                    attributions: 'dataforsyningen',
+                    url: 'https://api.dataforsyningen.dk/orto_foraar_DAF?token={{ kftoken }}',
+                    params: {
+                        "LAYERS": 'orto_foraar',
+                        // "STYLES": "default",
+                        "FORMAT": "image/jpeg",
+                        "TRANSPARENT": "TRUE",
+                        "ignoreillegallayers": "TRUE"
+                    },
+                    projection: projection,
+                }),
+            }),
+            markerLyrQ
+        ],
+        view: new ol.View({
+            center: initialCenter, // start center position
+            zoom: level,
+            projection: projection
+        })
+    });
+
+    var wmtsSource = new ol.source.WMTS({
+        attributions: "dataforsyningen",
+        // crossOrigin: 'Anonymous',
+        url: 'https://api.dataforsyningen.dk/topo_skaermkort_daempet_DAF?token={{ kftoken }}',
+        layer: 'topo_skaermkort_daempet',
+        matrixSet: 'View1',
+        format: 'image/jpeg',
+        tileGrid: dfTileGrid,
+        style: 'default',
+        size: Size
+    })
+    var answer = new ol.Map({
+        target: 'answer',
+        layers: [
+            new ol.layer.Tile({
+                opacity: 1.0,
+                preload: Infinity,
+                source: wmtsSource,
+            }),
+        ],
+        view: new ol.View({
+            center: initialCenter, // start center position
+            zoom: initialZoom, // start zoom level
+            maxZoom: 13,
+            minZoom: 2,
+            //resolutions: [1638.4,819.2,409.6,204.8,102.4,51.2,25.6,12.8,6.4,3.2,1.6,0.8,0.4,0.2,0.1], // Equal to WMTS resolutions with three more detailed levels
+            projection: projection // use our custom projection defined earlier
+        })
+    });
+    let markerLyrA = new ol.layer.Vector({
+        source: new ol.source.Vector({
+            features: [
+                new ol.Feature({
+                    geometry: new ol.geom.Point(initialCenter)
+                })
+            ]
+        }),
+        style: aStyle
+    });
+    answer.addLayer(markerLyrA);
+
+
+    function timer() {
+        var now = new Date().getTime();
+        var distance = now - start;
+        var seconds = Math.floor(distance / 1000);
+        document.getElementById("timer").innerHTML = `<b>${seconds}</b>`;
+    }
+    answer.on('click', function (e) {
+        markerLyrA.getSource().getFeatures()[0].setGeometry(new ol.geom.Point(e.coordinate));
+    });
+
+    // Init game
+
+    var totalScore = 0;
+    var nQuestions = 0;
+    var running = null;
+    var start = null;
+
+    function setQuestionStats(distance, score) {
+        document.getElementById("distance").innerHTML = distance + " m";
+        document.getElementById("score").innerHTML = score;
+    }
+
+    function resetGame() {
+        totalScore = 0;
+        nQuestions = 0;
+        document.getElementById("btnGuess").disabled = true;
+        setQuestionStats(0, 0);
+        document.getElementById("total").innerHTML = "0";
+        document.getElementById("qLeft").innerHTML = totalQuestions;
+    }
+
+    resetGame();
+
+    function getScore(dist, dt, lvl) {
+        // TODO: backend should do this
+        let score = 100;
+        if (dist > 30) {
+            score -= Math.min(100, Math.sqrt(dist * 0.8));
+        }
+        if (score > 0 && dt > 15) {
+            // time penalty
+            frac = Math.max(1, 100 - dt * 0.5) / 100.0;
+            score *= frac;
+        }
+        score *= lvl;
+        return Math.round(score);
+    }
+
+    function updateQuestion(coordinates) {
+        markerLyrQ.getSource()
+            .getFeatures()[0]
+            .setGeometry(new ol.geom.Point(coordinates));
+        question.getView().setCenter(coordinates);
+        answer.getView().setCenter(initialCenter);
+        answer.getView().setZoom(initialZoom);
+        markerLyrA.getSource()
+            .getFeatures()[0]
+            .setGeometry(new ol.geom.Point(initialCenter));
+        document.getElementById("btnGuess").disabled = false;
+        document.getElementById("btnNext").disabled = true;
+        document.getElementById("btnNext").textContent = "Next question";
+        start = new Date().getTime();
+        running = setInterval(timer, 1000);
+    }
+
+    function nextQuestion() {
+        document.getElementById("timer").innerHTML = "0";
+        setQuestionStats(0, 0);
+        if (nQuestions > 0) {
+            answer.removeLayer(markerLyrQ);
+        }
+        if (nQuestions == totalQuestions) {
+            // Starting a new game
+            resetGame();
+        }
+        fetch('/api/q/')
+            .then(response => response.json())
+            .then(data => updateQuestion(data.coordinates));
+    }
+
+    async function postData(url = '', data = {}) {
+        // Default options are marked with *
+        const response = await fetch(url, {
+            method: 'POST', // *GET, POST, PUT, DELETE, etc.
+            mode: 'cors', // no-cors, *cors, same-origin
+            cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+            credentials: 'same-origin', // include, *same-origin, omit
+            headers: {
+                'Content-Type': 'application/json'
+                // 'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            redirect: 'follow', // manual, *follow, error
+            referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+            body: JSON.stringify(data) // body data type must match "Content-Type" header
+        });
+        return response.json(); // parses JSON response into native JavaScript objects
+    }
+
+
+    function finish() {
+        clearInterval(running);
+        document.getElementById("btnGuess").disabled = true;
+        let now = new Date().getTime();
+        let dt = (now - start) / 1000;
+        let q = question.getView().getCenter();
+        let a = markerLyrA.getSource().getFeatures()[0].getGeometry().getCoordinates();
+        let dist = Math.round(
+            Math.sqrt(Math.pow(q[0] - a[0], 2) + Math.pow(q[1] - a[1], 2))
+        );
+        answer.addLayer(markerLyrQ);
+        let score = getScore(dist, dt, level / 2);
+        answer.getView().animate({
+            center: q,
+            duration: 2500,
+            zoom: question.getView().getZoom(),
+        });
+
+        setQuestionStats(dist, score);
+        totalScore += score;
+        document.getElementById("total").innerHTML = totalScore;
+        nQuestions += 1;
+        let qLeft = totalQuestions - nQuestions;
+        document.getElementById("qLeft").innerHTML = qLeft;
+        if (qLeft > 0) {
+            document.getElementById("btnNext").disabled = false;
+        } else {
+            // post score
+            console.log("Posting score");
+            postData("/api/score/", { score: totalScore, level: level });
+            document.getElementById("btnNext").textContent = "New game";
+            document.getElementById("btnNext").disabled = false;
+        }
+    }
+</script>
+{% endblock %}

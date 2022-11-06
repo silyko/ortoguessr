@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load static %}
+{% block head %}
+{{ block.super }}
+    <style>
+        .top-right {
+            position: absolute;
+            right: 20px;
+            top: 10px;
+        }
+    </style>
+{% endblock %}
+{% block body %}
+<script>
+    function goToGame(level) {
+        location.href = `/game/${level}/`; 
+    }
+
+    function changeUser() {
+        location.href = "/accounts/login/?next=/";
+    }
+</script>
+<div class="top-right">
+    <button type="button" class="btn btn-primary btn-sm" onclick="changeUser()">Change user</button>
+</div>
+<div class="container">
+    <div class="row mb-3">
+        <h2>&#128065;inTheSky</h2>
+    </div>
+    <div class="row mb-3">
+        <h5>Can you break the record, {{user.username}}?</h5>
+    </div>
+    <div class="row mb-1">
+        <h5>Select level:</h5>
+    </div>
+    <div class="row mb-3">
+        <div class="col pl-1">
+            <button type="button" class="btn btn-info" onclick="goToGame(4)">&#128118;</button>
+        </div>
+        <div class="col pl-1">
+            <button type="button" class="btn btn-primary" onclick="goToGame(5)">5</button>
+        </div>
+        <div class="col pl-1">
+            <button type="button" class="btn btn-success" onclick="goToGame(6)">6</button>
+        </div>
+        <div class="col pl-1">
+            <button type="button" class="btn btn-warning" onclick="goToGame(8)">8</button>
+        </div>
+        <div class="col pl-1 pr-1">
+            <button type="button" class="btn btn-danger" onclick="goToGame(10)">&#128560;</button>
+        </div>
+    </div>
+    <div class="row mb-3">
+        <h3> High Scores </h3>
+    </div>
+    <div class="row">
+        <div class="table-responsive">
+            <table class="table table-condensed table-striped">
+            <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Name</th>
+                <th scope="col">Score</th>
+                <th scope="col">Level</th>
+            </tr>
+            </thead>
+            <tbody>
+                {% for obj in scores %}
+            <tr>
+                <th scope="row">{{obj.rank}}</th>
+                <td>{{obj.user.username}}</td>
+                <td>{{obj.score}}</td>
+                <td>{{obj.level}}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    </div>
+</div>
+{% endblock %}

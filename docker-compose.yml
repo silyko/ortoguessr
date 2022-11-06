@@ -1,0 +1,25 @@
+version: "3"
+
+services:
+  db:
+    image: postgres:12
+    container_name: eye_db
+    environment:
+      - POSTGRES_PASSWORD=postgres
+  backend:
+    build: .
+    image: eye_in_the_sky
+    container_name: eye_backend
+    command: gunicorn --bind=0.0.0.0:8000 --access-logfile - -w 2 ortoguessr.wsgi
+    volumes:
+      - ./ortoguessr:/opt/ortoguessr
+    ports:
+      - "8080:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PASSWORD=postgres
+      - DB_USER=postgres
+      - DEBUG=${DEBUG-0}
+      - DATAFORSYNINGEN_TOKEN=${DATAFORSYNINGEN_TOKEN}
+    depends_on:
+      - db
